@@ -5,7 +5,6 @@
     "lib": ["ES2023"],
     "rootDir": "./src",
     "outDir": "./dist",
-    "moduleResolution": "node10",
     "ignoreDeprecations": "6.0",
     "strict": true,
     "noUnusedLocals": false,
