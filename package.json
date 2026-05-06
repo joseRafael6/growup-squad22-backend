@@ -3,9 +3,14 @@
   "version": "1.0.0",
   "description": "Projeto BlackBelt IT - Plataforma gamificada\r Node.js (v20+), TypeScript, Fastify, PostgreSQL (via Supabase), Prisma ORM e Clerk\r Clean Architecture e S.O.L.I.D.",
   "main": "index.js",
+  
   "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "start": "node dist/main.js",
+    "build": "tsc",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
+
   "repository": {
     "type": "git",
     "url": "git+https://github.com/joseRafael6/growup-squad22-backend.git"
@@ -18,7 +23,10 @@
     "url": "https://github.com/joseRafael6/growup-squad22-backend/issues"
   },
   "homepage": "https://github.com/joseRafael6/growup-squad22-backend#readme",
-  "dependencies": {
-    "fastify": "^5.8.5"
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "fastify": "^5.8.5",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.3"
   }
 }
