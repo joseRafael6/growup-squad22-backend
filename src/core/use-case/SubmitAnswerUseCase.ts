@@ -21,7 +21,7 @@ export class SubmitAnswerUseCase {
   }> {
     const session = await this.sessionRepo.findById(input.sessionId);
     if (!session) throw new AppError('Sessão inválida.', 404);
-    if (session.status !== 'in_progress') throw new AppError('Sessão já finalizada.', 400);
+    if (session.status !== 'Em_progresso') throw new AppError('Sessão já finalizada.', 400);
 
     if (session.answeredQuestionIds.includes(input.questionId)) {
       throw new AppError('Questão já respondida.', 409);

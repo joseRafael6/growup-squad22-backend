@@ -21,7 +21,7 @@ export class GetQuestionsUseCase {
       id: randomUUID(),
       userId,
       quizId,
-      status: 'in_progress',
+      status: 'Em_progresso',
       totalScore: 0,
       startedAt: new Date(),
       answeredQuestionIds: [],
