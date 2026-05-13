@@ -1,13 +1,16 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { GetQuestionsUseCase } from '../../../core/use-case/GetQuestionsUseCase';
 import { SubmitAnswerUseCase } from '../../../core/use-case/SubmitAnswerUseCase';
+import { GetRankingUseCase } from '../../../core/use-case/GetRankingUseCase'; //NOVO !!!!!!!
 import { QuestionViewModel } from '../view-models/QuestionViewModel';
+import { RankingViewModel } from '../view-models/RankingViewModel'; //NOVO !!!!!!!!!!!!
 import { AppError } from '../../../shared/errors/AppError';
 
 export class QuizController {
   constructor(
     private getQuestionsUseCase: GetQuestionsUseCase,
-    private submitAnswerUseCase: SubmitAnswerUseCase
+    private submitAnswerUseCase: SubmitAnswerUseCase,
+    private getRankingUseCase: GetRankingUseCase, //NOVO !!!!!!
   ) {}
 
   async getQuestions(request: FastifyRequest, reply: FastifyReply) {
@@ -45,6 +48,24 @@ export class QuizController {
       });
 
       return reply.status(201).send(result);
+    } catch (error) {
+      this.handleError(error, reply);
+    }
+  }
+  //NOVO!!!!!!
+  async getRanking(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const { quizId, userId } = request.query as any;
+      if (!quizId || !userId) {
+        throw new AppError('quizId e userId são obrigatórios', 400);
+      }
+
+      const result = await this.getRankingUseCase.execute(quizId, userId);
+
+      return reply.send({
+        top10: result.top10.map(RankingViewModel.toHTTP),
+        myRank: result.userRank ? RankingViewModel.toHTTP(result.userRank) : null,
+      });
     } catch (error) {
       this.handleError(error, reply);
     }

@@ -1,3 +1,4 @@
+// src/infra/database/repositories/InMemoryQuizSessionRepository.ts
 import { IQuizSessionRepository } from "../../core/repositories/IQuizSessionRepository";
 import { QuizSession } from "../../core/entities/QuizSession";
 
@@ -16,5 +17,11 @@ export class InMemoryQuizSessionRepository implements IQuizSessionRepository {
   async update(session: QuizSession): Promise<QuizSession> {
     this.sessions.set(session.id, { ...session });
     return session;
+  }
+
+  // NOVO MÉTODO!!!!!!
+  async findByQuizId(quizId: string): Promise<QuizSession[]> {
+    const allSessions = Array.from(this.sessions.values());
+    return allSessions.filter(session => session.quizId === quizId);
   }
 }
