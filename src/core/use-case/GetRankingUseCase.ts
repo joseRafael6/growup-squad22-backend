@@ -21,7 +21,7 @@ export class GetRankingUseCase {
     
     // 2. Filtra apenas sessões completadas
     const completedSessions = sessions.filter(
-      s => s.status === 'completed' && s.completedAt
+      s => s.status === 'Completado' && s.completedAt
     );
 
     if (completedSessions.length === 0) {
