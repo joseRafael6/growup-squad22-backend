@@ -1,0 +1,77 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model users {
+  id         String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email      String         @unique
+  name       String?
+  clerkId    String?        @unique @map("clerkId")
+  role       String?        @default("user")
+  created_at DateTime?      @default(now()) @db.Timestamptz(6)
+  updated_at DateTime?      @default(now()) @db.Timestamptz(6)
+  sessions   quiz_session[]
+
+  @@index([email], map: "idx_users_email")
+  @@index([clerkId], map: "idx_users_clerkid")
+  @@map("users")
+}
+
+model question {
+  id               String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  text             String
+  weight           Int
+  timeLimitSeconds Int
+  quizId           String                  @map("quizId")
+  alternatives     alternative[]
+  sessionQuestions quiz_session_question[]
+
+  @@map("questions")
+}
+
+model alternative {
+  id         String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  text       String
+  isCorrect  Boolean                 @map("isCorrect")
+  questionId String                  @map("questionId") @db.Uuid
+  question   question                @relation(fields: [questionId], references: [id])
+  answers    quiz_session_question[]
+
+  @@map("alternatives")
+}
+
+model quiz_session {
+  id        String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  quizId    String                  @map("quizId")
+  userId    String                  @map("userId") @db.Uuid
+  startTime DateTime                @map("startTime") @db.Timestamptz(6)
+  endTime   DateTime?               @map("endTime") @db.Timestamptz(6)
+  score     Int?
+  createdAt DateTime                @default(now()) @map("createdAt") @db.Timestamptz(6)
+  updatedAt DateTime                @updatedAt @map("updatedAt") @db.Timestamptz(6)
+  answers   quiz_session_question[]
+  user      users                   @relation(fields: [userId], references: [id])
+
+  @@map("quiz_sessions")
+}
+
+model quiz_session_question {
+  id            String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sessionId     String       @map("sessionId") @db.Uuid
+  questionId    String       @map("questionId") @db.Uuid
+  alternativeId String?      @map("alternativeId") @db.Uuid
+  isCorrect     Boolean?     @map("isCorrect")
+  answeredAt    DateTime     @default(now()) @map("answeredAt") @db.Timestamptz(6)
+  alternative   alternative? @relation(fields: [alternativeId], references: [id])
+  question      question     @relation(fields: [questionId], references: [id])
+  session       quiz_session @relation(fields: [sessionId], references: [id])
+
+  @@unique([sessionId, questionId])
+  @@map("quiz_session_questions")
+}

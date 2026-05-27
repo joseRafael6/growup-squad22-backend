@@ -2,6 +2,7 @@ import { IQuizSessionRepository } from '../repositories/IQuizSessionRepository';
 import { IQuestionRepository } from '../repositories/IQuestionRepository';
 import { calculateScore } from '../../shared/utils/scoreCalculator';
 import { AppError } from '../../shared/errors/AppError';
+import prisma from '../../infra/database/prisma.client';
 
 export class SubmitAnswerUseCase {
   constructor(
@@ -45,6 +46,27 @@ export class SubmitAnswerUseCase {
 
     session.totalScore += pointsEarned;
     session.answeredQuestionIds.push(input.questionId);
+   // 1. Persistir a resposta na tabela pivot do Prisma diretamente
+    await prisma.quiz_session_question.create({
+      data: {
+        sessionId: input.sessionId,
+        questionId: input.questionId,
+        alternativeId: input.optionId,
+        isCorrect: chosen.isCorrect,
+      }
+    });
+
+    // 2. Atualizar a entidade de sessão localmente
+    session.totalScore += pointsEarned;
+    session.answeredQuestionIds.push(input.questionId);
+
+    // 3. REGRA DE NEGÓCIO: Verificar se respondeu todas as perguntas do Quiz
+    if (session.answeredQuestionIds.length === questions.length) {
+      session.status = 'completo';
+      session.completedAt = new Date();
+    }
+
+    // 4. Salvar as alterações da sessão no repositório
     await this.sessionRepo.update(session);
 
     return {
