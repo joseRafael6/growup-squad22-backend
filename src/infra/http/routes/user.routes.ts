@@ -7,17 +7,20 @@ interface SyncUserBody {
   email: string;
   name?: string;
   clerkId: string;
+  // Novos campos de perfil
+  companyName?: string;
+  sector?: string;
+  // Código de convite para vincular à empresa do sistema
+  inviteCode?: string;
 }
 
 function isValidEmail(email: string): boolean {
-  // Exige formato: letras/números/símbolos @ domínio . extensão com 2+ letras
-  // Rejeita: "abc@abc.a", "texto puro", "123", espaços, etc.
   const emailRegex = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/;
   return emailRegex.test(email);
 }
 
 export async function userRoutes(fastify: FastifyInstance) {
-  
+
   fastify.get("/health", async () => {
     return { status: "OK", timestamp: new Date().toISOString() };
   });
@@ -32,54 +35,139 @@ export async function userRoutes(fastify: FastifyInstance) {
     reply: FastifyReply
   ) => {
     try {
-      let { email, name, clerkId } = request.body;
+      let { email, name, clerkId, companyName, sector, inviteCode } = request.body;
 
       // 1. Campos obrigatórios
       if (!email || email.trim() === "") {
         return reply.status(400).send({ error: "Email é obrigatório e não pode estar em branco" });
       }
-
       if (!clerkId || clerkId.trim() === "") {
         return reply.status(400).send({ error: "clerkId é obrigatório" });
       }
 
-      // 2. Limpar espaços das bordas
       email = email.trim();
 
-      // 3. Validar formato de email
+      // 2. Validar formato de email
       if (!isValidEmail(email)) {
-        return reply.status(400).send({ 
-          error: "Formato de email inválido. Exemplo: usuario@email.com" 
+        return reply.status(400).send({
+          error: "Formato de email inválido. Exemplo: usuario@email.com"
         });
       }
 
-      // 4. Verificar se o email já está cadastrado com outro clerkId
+      // 3. Verificar duplicidade de email
       const userRepository = new SupabaseUserRepository();
       const existingUser = await userRepository.findByEmail(email);
-
       if (existingUser) {
-          return reply.status(409).send({ 
-            error: "Este e-mail já está cadastrado. Tente fazer login." 
-          });
+        return reply.status(409).send({
+          error: "Este e-mail já está cadastrado. Tente fazer login."
+        });
       }
 
-      // 5. Sincronizar
+      // 4. Validar código de convite (se fornecido)
+      let companyId: string | null = null;
+      if (inviteCode && inviteCode.trim() !== "") {
+        const company = await prisma.company.findUnique({
+          where: { inviteCode: inviteCode.trim().toUpperCase() }
+        });
+        if (!company) {
+          return reply.status(400).send({
+            error: "Código de convite inválido. Verifique o código e tente novamente."
+          });
+        }
+        companyId = company.id;
+      }
+
+      // 5. Sincronizar usuário
       const syncUserUseCase = new SyncUserUseCase(userRepository);
-      const { user, created } = await syncUserUseCase.execute({ 
-        email, 
+      const { user, created } = await syncUserUseCase.execute({
+        email,
         name: name?.trim(),
-        clerkId
+        clerkId,
+        companyName: companyName?.trim(),
+        sector: sector?.trim(),
       });
-      
-      return reply.status(created ? 201 : 200).send({ user });
-      
+
+      // 6. Vincular à empresa se código válido
+      if (companyId && user) {
+        await prisma.company_member.upsert({
+          where: {
+            userId_companyId: { userId: user.id, companyId }
+          },
+          update: {},
+          create: { userId: user.id, companyId }
+        });
+      }
+
+      // 7. Retornar dados completos incluindo empresa vinculada
+      const companyInfo = companyId
+        ? await prisma.company.findUnique({ where: { id: companyId }, select: { id: true, name: true, topic: true } })
+        : null;
+
+      return reply.status(created ? 201 : 200).send({
+        user,
+        company: companyInfo ?? null,
+      });
+
     } catch (error: any) {
-      // Segurança: caso a constraint unique do banco seja violada por race condition
       if (error.code === "P2002") {
         return reply.status(409).send({ error: "Este e-mail já está cadastrado" });
       }
       fastify.log.error(error);
       return reply.status(500).send({ error: "Erro interno do servidor" });
+    }
+  });
+
+  // GET /users/me — retorna dados do usuário autenticado + empresa vinculada
+  fastify.get("/users/me", async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const authHeader = request.headers.authorization;
+      if (!authHeader?.startsWith("Bearer ")) {
+        return reply.status(401).send({ error: "Token ausente" });
+      }
+
+      const { verifyToken } = await import("@clerk/backend");
+      const token = authHeader.replace("Bearer ", "").trim();
+      const payload = await verifyToken(token, {
+        secretKey: process.env.CLERK_SECRET_KEY!,
+        jwtKey: process.env.CLERK_JWT_KEY,
+      } as any);
+
+      const clerkId = payload.sub;
+      const user = await prisma.users.findUnique({
+        where: { clerkId },
+        include: {
+          memberships: {
+            include: {
+              company: { select: { id: true, name: true, topic: true } }
+            }
+          },
+          companyAdmins: {
+            include: {
+              company: { select: { id: true, name: true } }
+            }
+          }
+        }
+      });
+
+      if (!user) {
+        return reply.status(404).send({ error: "Usuário não encontrado. Sincronize primeiro." });
+      }
+
+      return reply.send({
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        companyName: user.companyName,
+        sector: user.sector,
+        // Empresas onde é membro comum
+        companies: user.memberships.map(m => m.company),
+        // Empresas onde é admin
+        adminOf: user.companyAdmins.map(a => a.company),
+      });
+    } catch (err: any) {
+      fastify.log.error(err);
+      return reply.status(401).send({ error: "Token inválido" });
     }
   });
 }

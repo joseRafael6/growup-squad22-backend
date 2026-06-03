@@ -1,0 +1,67 @@
+body {
+  font-family: Arial, sans-serif;
+  background: #f0f2f5;
+  margin: 0;
+  padding: 20px;
+}
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #ddd;
+  padding-bottom: 10px;
+}
+button {
+  background: #007bff;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  margin: 5px;
+}
+button:hover {
+  background: #0056b3;
+}
+.card {
+  border: 1px solid #ddd;
+  padding: 15px;
+  border-radius: 8px;
+  margin: 15px 0;
+  background: #f9f9f9;
+}
+#questions-list {
+  max-height: 400px;
+  overflow-y: auto;
+  background: white;
+  padding: 10px;
+  border: 1px solid #ccc;
+  margin-top: 10px;
+}
+.question-item {
+  border-bottom: 1px solid #eee;
+  padding: 10px;
+}
+.alternative {
+  margin-left: 20px;
+}
+.delete-btn {
+  background: #dc3545;
+  margin-top: 5px;
+}
+.delete-btn:hover {
+  background: #c82333;
+}
+#quiz-area {
+  background: #e9ecef;
+  padding: 15px;
+  border-radius: 8px;
+}

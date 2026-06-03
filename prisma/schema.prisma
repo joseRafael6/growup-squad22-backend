@@ -9,18 +9,96 @@ datasource db {
 }
 
 model users {
-  id         String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  email      String         @unique
-  name       String?
-  clerkId    String?        @unique @map("clerkId")
-  role       String?        @default("user")
-  created_at DateTime?      @default(now()) @db.Timestamptz(6)
-  updated_at DateTime?      @default(now()) @db.Timestamptz(6)
-  sessions   quiz_session[]
+  id            String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email         String         @unique
+  name          String?
+  clerkId       String?        @unique @map("clerkId")
+  role          String?        @default("user")
+  companyName   String?        @map("company_name")
+  sector        String?
+  created_at    DateTime?      @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime?      @default(now()) @db.Timestamptz(6)
+  sessions      quiz_session[]
+  companyAdmins company_admin[]
+  memberships   company_member[]
 
   @@index([email], map: "idx_users_email")
   @@index([clerkId], map: "idx_users_clerkid")
   @@map("users")
+}
+
+model company {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name           String
+  topic          String?
+  questionSource String   @default("both") @map("question_source")
+  inviteCode     String   @unique @map("invite_code")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  admins       company_admin[]
+  members      company_member[]
+  questions    question[]
+  // Quizzes criados pelo admin da empresa
+  companyQuizzes company_quiz[]
+
+  @@map("companies")
+}
+
+model company_admin {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  companyId String   @map("company_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user    users   @relation(fields: [userId], references: [id])
+  company company @relation(fields: [companyId], references: [id])
+
+  @@unique([userId, companyId])
+  @@map("company_admins")
+}
+
+model company_member {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  companyId String   @map("company_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user    users   @relation(fields: [userId], references: [id])
+  company company @relation(fields: [companyId], references: [id])
+
+  @@unique([userId, companyId])
+  @@map("company_members")
+}
+
+// Quiz salvo criado pelo admin da empresa
+model company_quiz {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId   String   @map("company_id") @db.Uuid
+  name        String
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  company   company              @relation(fields: [companyId], references: [id])
+  // Perguntas selecionadas para este quiz
+  questions company_quiz_question[]
+  sessions  quiz_session[]
+
+  @@map("company_quizzes")
+}
+
+// Tabela de junção: quais perguntas estão em cada quiz da empresa
+model company_quiz_question {
+  id             String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyQuizId  String @map("company_quiz_id") @db.Uuid
+  questionId     String @map("question_id") @db.Uuid
+
+  companyQuiz company_quiz @relation(fields: [companyQuizId], references: [id])
+  question    question     @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([companyQuizId, questionId])
+  @@map("company_quiz_questions")
 }
 
 model question {
@@ -29,8 +107,16 @@ model question {
   weight           Int
   timeLimitSeconds Int
   quizId           String                  @map("quizId")
+  // "platform" = banco global | "company" = criada pelo admin da empresa
+  source           String                  @default("platform")
+  // Categoria — só para perguntas do banco global (source = "platform")
+  // Ex: "LGPD", "Segurança da Informação", "TI Básico"
+  category         String?
+  companyId        String?                 @map("company_id") @db.Uuid
   alternatives     alternative[]
   sessionQuestions quiz_session_question[]
+  company          company?                @relation(fields: [companyId], references: [id])
+  companyQuizzes   company_quiz_question[]
 
   @@map("questions")
 }
@@ -40,23 +126,28 @@ model alternative {
   text       String
   isCorrect  Boolean                 @map("isCorrect")
   questionId String                  @map("questionId") @db.Uuid
-  question   question                @relation(fields: [questionId], references: [id])
+  question   question                @relation(fields: [questionId], references: [id], onDelete: Cascade)
   answers    quiz_session_question[]
 
   @@map("alternatives")
 }
 
 model quiz_session {
-  id        String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  quizId    String                  @map("quizId")
-  userId    String                  @map("userId") @db.Uuid
-  startTime DateTime                @map("startTime") @db.Timestamptz(6)
-  endTime   DateTime?               @map("endTime") @db.Timestamptz(6)
-  score     Int?
-  createdAt DateTime                @default(now()) @map("createdAt") @db.Timestamptz(6)
-  updatedAt DateTime                @updatedAt @map("updatedAt") @db.Timestamptz(6)
-  answers   quiz_session_question[]
-  user      users                   @relation(fields: [userId], references: [id])
+  id             String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  quizId         String                  @map("quizId")
+  userId         String                  @map("userId") @db.Uuid
+  // Se foi gerado por um quiz da empresa, referencia aqui
+  companyQuizId  String?                 @map("company_quiz_id") @db.Uuid
+  // "global" = ranking geral | "company" = ranking da empresa
+  rankingScope   String                  @default("global") @map("ranking_scope")
+  startTime      DateTime                @map("startTime") @db.Timestamptz(6)
+  endTime        DateTime?               @map("endTime") @db.Timestamptz(6)
+  score          Int?
+  createdAt      DateTime                @default(now()) @map("createdAt") @db.Timestamptz(6)
+  updatedAt      DateTime                @updatedAt @map("updatedAt") @db.Timestamptz(6)
+  answers        quiz_session_question[]
+  user           users                   @relation(fields: [userId], references: [id])
+  companyQuiz    company_quiz?           @relation(fields: [companyQuizId], references: [id])
 
   @@map("quiz_sessions")
 }
@@ -69,7 +160,7 @@ model quiz_session_question {
   isCorrect     Boolean?     @map("isCorrect")
   answeredAt    DateTime     @default(now()) @map("answeredAt") @db.Timestamptz(6)
   alternative   alternative? @relation(fields: [alternativeId], references: [id])
-  question      question     @relation(fields: [questionId], references: [id])
+  question      question     @relation(fields: [questionId], references: [id], onDelete: Cascade)
   session       quiz_session @relation(fields: [sessionId], references: [id])
 
   @@unique([sessionId, questionId])

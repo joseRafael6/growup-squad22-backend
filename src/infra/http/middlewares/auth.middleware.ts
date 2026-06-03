@@ -31,7 +31,8 @@ export async function authMiddleware(
     } as any);
 
     // Disponibiliza o payload nos controllers via request.user
-    (request as any).user = payload;
+    
+  (request as any).user = payload;
   } catch (err) {
     return reply.status(401).send({ message: "Token inválido" });
   }

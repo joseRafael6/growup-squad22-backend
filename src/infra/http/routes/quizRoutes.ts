@@ -14,5 +14,6 @@ export async function quizRoutes(app: FastifyInstance, opts: QuizRouteOptions) {
 
   app.get('/questions', (request, reply) => controller.getQuestions(request, reply));
   app.post('/answers', (request, reply) => controller.submitAnswer(request, reply));
+  app.post('/sessions/:sessionId/finish', (request, reply) => controller.finishSession(request, reply));
   app.get('/ranking', (request, reply) => controller.getRanking(request, reply));
 }

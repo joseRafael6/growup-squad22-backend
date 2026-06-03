@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GrowUp Quiz - Teste Backend</title>
+  <link rel="stylesheet" href="style.css">
+  <script
+    async crossorigin="anonymous"
+    data-clerk-publishable-key="pk_test_dm9jYWwtcHVtYS0xNC5jbGVyay5hY2NvdW50cy5kZXYk"
+    src="https://cdn.jsdelivr.net/npm/@clerk/clerk-js@5/dist/clerk.browser.js"
+    type="text/javascript"
+  ></script>
+  <style>
+    header { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; padding:12px 20px; background:#1a1a2e; color:#fff; border-radius:8px; margin-bottom:20px; }
+    header h1 { margin:0; font-size:1.2rem; }
+    #user-badge { display:none; flex-direction:column; align-items:flex-end; gap:2px; font-size:.85rem; }
+    #user-badge .badge-email { font-weight:600; color:#a0d4ff; }
+    #user-badge .badge-company { color:#c8f0c8; font-size:.82rem; background:#1e3a1e; padding:2px 8px; border-radius:10px; }
+    #user-badge .badge-sector { color:#ffd6a0; font-size:.78rem; background:#3a2e10; padding:2px 8px; border-radius:10px; }
+    #user-badge .badge-role { font-size:.72rem; background:#3a3a6a; padding:2px 8px; border-radius:10px; margin-top:2px; }
+    .sync-form { display:flex; flex-direction:column; gap:10px; max-width:420px; }
+    .sync-form input, .sync-form select { padding:8px 12px; border:1px solid #ccc; border-radius:6px; font-size:.95rem; }
+    .sync-form .hint { font-size:.78rem; color:#888; margin-top:-6px; }
+    .quiz-options { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:12px; }
+    .quiz-options select, .quiz-options input { padding:8px 12px; border:1px solid #ccc; border-radius:6px; }
+    .tab-bar { display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; }
+    .tab-bar button { padding:8px 16px; border:1px solid #ccc; border-radius:6px; background:#f5f5f5; cursor:pointer; }
+    .tab-bar button.active { background:#1a1a2e; color:#fff; border-color:#1a1a2e; }
+    .tab-content { display:none; }
+    .tab-content.active { display:block; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>🎯 GrowUp Quiz</h1>
+    <div id="user-badge">
+      <span class="badge-email" id="badge-email"></span>
+      <span class="badge-company" id="badge-company"></span>
+      <span class="badge-sector" id="badge-sector"></span>
+      <span class="badge-role" id="badge-role"></span>
+    </div>
+    <button id="logout-btn" style="display:none;">Sair</button>
+  </header>
+
+  <!-- Login -->
+  <div id="login-section">
+    <h2>Login (Magic Link)</h2>
+    <div id="clerk-sign-in"></div>
+  </div>
+
+  <!-- Área do Usuário -->
+  <div id="user-section" style="display:none;">
+
+    <!-- Tabs -->
+    <div class="tab-bar">
+      <button class="tab-btn active" data-tab="tab-quiz">🎮 Quiz</button>
+      <button class="tab-btn" data-tab="tab-ranking">🏆 Ranking</button>
+      <button class="tab-btn" data-tab="tab-profile">👤 Perfil</button>
+    </div>
+
+    <!-- Tab Quiz -->
+    <div id="tab-quiz" class="tab-content active">
+      <div class="card">
+        <h3>Iniciar Quiz</h3>
+        <div class="quiz-options">
+          <select id="quiz-mode">
+            <option value="global">🌐 Banco Global (aleatório)</option>
+            <option value="global_category">📂 Banco Global por Categoria</option>
+          </select>
+          <select id="quiz-category" style="display:none;">
+            <option value="">Carregando categorias...</option>
+          </select>
+          <input type="number" id="quiz-limit" placeholder="Qtd. perguntas (min 10)" min="10" value="10" style="width:200px;">
+        </div>
+        <button id="get-questions-btn">▶ Iniciar</button>
+      </div>
+      <div id="quiz-area" style="margin-top:20px;"></div>
+    </div>
+
+    <!-- Tab Ranking -->
+    <div id="tab-ranking" class="tab-content">
+      <div class="card">
+        <h3>Ver Ranking</h3>
+        <div class="quiz-options">
+          <select id="ranking-scope" style="display:none;">
+            <option value="global">🌐 Ranking Geral</option>
+          </select>
+          <select id="ranking-company" style="display:none;">
+            <option value="">Selecione a empresa...</option>
+          </select>
+        </div>
+        <button id="ranking-btn">Ver Ranking</button>
+        <div id="ranking-area" style="margin-top:16px;"></div>
+      </div>
+    </div>
+
+    <!-- Tab Perfil -->
+    <div id="tab-profile" class="tab-content">
+      <div class="card">
+        <h3>📋 Meu Cadastro</h3>
+        <div class="sync-form">
+          <input type="text" id="sync-name" placeholder="Seu nome completo">
+          <input type="text" id="sync-company" placeholder="Nome da empresa (ex: BlackBelt IT)" required>
+          <input type="text" id="sync-sector" placeholder="Setor (ex: TI, RH, Financeiro)">
+          <button id="sync-user-btn">💾 Salvar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Painel Admin -->
+  <div id="admin-section" style="display:none;">
+    <hr>
+    <h2>👑 Painel Administrativo</h2>
+    <div class="tab-bar">
+      <button class="admin-tab-btn active" data-tab="admin-tab-list">📋 Listar</button>
+      <button class="admin-tab-btn" data-tab="admin-tab-create">➕ Criar Pergunta</button>
+    </div>
+
+    <!-- Admin: Listar -->
+    <div id="admin-tab-list" class="tab-content active">
+      <div class="card">
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;">
+          <select id="admin-filter-category">
+            <option value="">Todas as categorias</option>
+          </select>
+          <button id="list-questions-btn">🔄 Carregar</button>
+        </div>
+        <div id="questions-list"></div>
+      </div>
+    </div>
+
+    <!-- Admin: Criar -->
+    <div id="admin-tab-create" class="tab-content">
+      <div class="card">
+        <h3>Nova Pergunta no Banco Global</h3>
+        <div class="sync-form">
+          <input type="text" id="question-text" placeholder="Enunciado da pergunta" required>
+          <input type="text" id="question-category" placeholder="Categoria (ex: LGPD, Segurança, TI Básico)">
+          <p class="hint">Categoria permite filtrar perguntas no quiz. Obrigatório para banco global.</p>
+          <input type="number" id="question-weight" placeholder="Peso (ex: 10)" value="10">
+          <input type="number" id="question-time" placeholder="Tempo limite (segundos)" value="30">
+          <h4>Alternativas (mínimo 2, marque a correta)</h4>
+          <div id="alternatives-container">
+            <div class="alt-row"><input type="text" placeholder="Alternativa 1" class="alt-text"> <label><input type="checkbox" class="alt-correct"> Correta</label></div>
+            <div class="alt-row"><input type="text" placeholder="Alternativa 2" class="alt-text"> <label><input type="checkbox" class="alt-correct"> Correta</label></div>
+            <div class="alt-row"><input type="text" placeholder="Alternativa 3" class="alt-text"> <label><input type="checkbox" class="alt-correct"> Correta</label></div>
+            <div class="alt-row"><input type="text" placeholder="Alternativa 4" class="alt-text"> <label><input type="checkbox" class="alt-correct"> Correta</label></div>
+          </div>
+          <button id="create-question-btn">✅ Criar Pergunta</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="script.js"></script>
+</body>
+</html>

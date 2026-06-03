@@ -1,4 +1,4 @@
-export type SessionStatus = 'in_progress' | 'completo' | 'abandonado';
+export type SessionStatus = 'Em_progresso' | 'completo' | 'abandonado';
 
 export interface QuizSession {
   id: string;                    // ID único da sessão

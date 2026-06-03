@@ -22,17 +22,20 @@ export class SubmitAnswerUseCase {
   }> {
     const session = await this.sessionRepo.findById(input.sessionId);
     if (!session) throw new AppError('Sessão inválida.', 404);
-    if (session.status !== 'Em_progresso') throw new AppError('Sessão já finalizada.', 400);
+    if (session.status === 'completo') throw new AppError('Sessão já finalizada.', 400);
 
     if (session.answeredQuestionIds.includes(input.questionId)) {
       throw new AppError('Questão já respondida.', 409);
     }
 
-    const questions = await this.questionRepo.findByQuizId(session.quizId);
-    const question = questions.find(q => q.id === input.questionId);
+    // Busca a questão diretamente pelo ID, independente do quizId
+    const question = await prisma.question.findUnique({
+      where: { id: input.questionId },
+      include: { alternatives: true },
+    });
     if (!question) throw new AppError('Questão não encontrada.', 404);
 
-    const chosen = question.alternatives.find(a => a.id === input.optionId);
+    const chosen = question.alternatives.find((a: any) => a.id === input.optionId);
     if (!chosen) throw new AppError('Alternativa inválida.', 400);
 
     let pointsEarned = 0;
@@ -44,9 +47,7 @@ export class SubmitAnswerUseCase {
       );
     }
 
-    session.totalScore += pointsEarned;
-    session.answeredQuestionIds.push(input.questionId);
-   // 1. Persistir a resposta na tabela pivot do Prisma diretamente
+    // Persiste a resposta
     await prisma.quiz_session_question.create({
       data: {
         sessionId: input.sessionId,
@@ -56,17 +57,10 @@ export class SubmitAnswerUseCase {
       }
     });
 
-    // 2. Atualizar a entidade de sessão localmente
+    // Atualiza a sessão
     session.totalScore += pointsEarned;
     session.answeredQuestionIds.push(input.questionId);
 
-    // 3. REGRA DE NEGÓCIO: Verificar se respondeu todas as perguntas do Quiz
-    if (session.answeredQuestionIds.length === questions.length) {
-      session.status = 'completo';
-      session.completedAt = new Date();
-    }
-
-    // 4. Salvar as alterações da sessão no repositório
     await this.sessionRepo.update(session);
 
     return {
