@@ -1,86 +1,247 @@
-Principais Casos de Uso Implementados:
-SyncUserUseCase: Sincroniza os dados dos usuários entre o Clerk Auth e o banco PostgreSQL local, gerenciando fluxo de criação e atualização.
+# 🥋 BlackBelt IT — Backend
 
-GetQuestionsUseCase: Inicializa uma nova sessão de quiz para o usuário, busca as questões cadastradas de forma embaralhada e prepara o fluxo de respostas.
+> Plataforma gamificada de quizzes técnicos para eventos e treinamentos corporativos.
+> Projeto desenvolvido durante a **Residência em Software & IA — GrowUp | Squad 22**.
 
-SubmitAnswerUseCase: Recebe a alternativa escolhida, valida o tempo de resposta, verifica a precisão e calcula dinamicamente a pontuação ganha usando um fator multiplicador de tempo.
+---
 
-GetRankingUseCase: Constrói o Top 10 de jogadores ordenando por maior pontuação e usa o menor tempo total de resposta como critério de desempate.
+## 📌 Sobre o Projeto
 
-⚙️ Configuração do Ambiente
-1. Pré-requisitos
-Certifique-se de possuir o Node.js (v20 ou superior) instalado na sua máquina.
+O **BlackBelt IT** é uma API backend para uma plataforma de quizzes gamificados voltada para eventos de tecnologia (como o RecnPlay) e treinamentos internos. O sistema permite que participantes respondam perguntas técnicas, recebam pontuações em tempo real e disputem um ranking global — sem necessidade de cadastro com senha.
 
-2. Variáveis de Ambiente (.env)
-Crie um arquivo chamado .env na raiz do projeto baseado no arquivo .env.example enviado. Ele deve conter as credenciais do Supabase e as chaves do Clerk obtidas nos seus respectivos painéis:
+**Problema resolvido:** Empresas enfrentam baixa adesão em treinamentos internos e dificuldade em medir o conhecimento real dos colaboradores. O BlackBelt IT engaja os participantes via gamificação (ranking, quizzes com tempo) e gera dados acionáveis para gestores.
 
-Snippet de código
-# Conexão com o Supabase via Connection Pooling (Usado pela aplicação no dia a dia)
-DATABASE_URL="postgresql://postgres.[seu_id_projeto]:[sua_senha]@[aws-1-us-east-1.pooler.supabase.com:6543/postgres?pgbouncer=true](https://aws-1-us-east-1.pooler.supabase.com:6543/postgres?pgbouncer=true)"
+---
 
-# Conexão Direta ao Banco de Dados (Obrigatório para rodar as Migrations do Prisma)
-DIRECT_URL="postgresql://postgres.[seu_id_projeto]:[sua_senha]@[aws-1-us-east-1.pooler.supabase.com:5432/postgres](https://aws-1-us-east-1.pooler.supabase.com:5432/postgres)"
+## 🚀 Stack de Tecnologia
 
-# Autenticação e Segurança (Clerk)
+| Camada | Tecnologia |
+|---|---|
+| Runtime | Node.js v20+ |
+| Linguagem | TypeScript |
+| Framework HTTP | Fastify |
+| Banco de Dados | PostgreSQL via Supabase |
+| ORM | Prisma |
+| Autenticação | Clerk (Magic Link / OTP) |
+| Rate Limiting | @fastify/rate-limit |
+
+---
+
+## 🏗️ Arquitetura
+
+O projeto adota **Clean Architecture** com princípios **S.O.L.I.D.**, separando as regras de negócio da infraestrutura técnica:
+
+```
+src/
+├── core/                        # Regras de negócio (independentes de framework)
+│   ├── entities/                # Entidades do domínio (Question, QuizSession)
+│   ├── repositories/            # Interfaces dos repositórios (contratos)
+│   └── use-case/                # Casos de uso da aplicação
+│       ├── GetQuestionsUseCase.ts
+│       ├── SubmitAnswerUseCase.ts
+│       ├── GetRankingUseCase.ts
+│       ├── AdminQuestionUseCase.ts
+│       └── sync-user.usecase.ts
+│
+├── infra/                       # Detalhes de implementação
+│   ├── database/                # Implementações dos repositórios (Prisma/Supabase)
+│   └── http/
+│       ├── controllers/         # Controllers das rotas
+│       ├── middlewares/         # Auth (Clerk JWT) e Admin guard
+│       ├── routes/              # Definição das rotas
+│       └── view-models/         # DTOs de resposta (Ranking, Question)
+│
+├── shared/
+│   ├── errors/                  # AppError customizado
+│   └── utils/                   # Utilitários (scoreCalculator)
+│
+├── app.ts                       # Configuração do Fastify e plugins
+├── server.ts                    # Inicialização do servidor
+└── main.ts                      # Entry point
+```
+
+**Por que essa estrutura funciona?**
+- **Independência de framework:** trocar Fastify por Express exige alterações apenas em `infra/http`, sem tocar nas regras de negócio.
+- **Testabilidade:** os Use Cases podem ser testados com repositórios em memória (mocks), sem banco real.
+- **Segurança centralizada:** as verificações de permissão ficam nos middlewares e Use Cases, não espalhadas pelas rotas.
+
+---
+
+## ⚙️ Pré-requisitos
+
+- Node.js **v20+**
+- npm ou yarn
+- Conta no [Supabase](https://supabase.com) (tier gratuito)
+- Conta no [Clerk](https://clerk.com) (plano gratuito)
+
+---
+
+## 🔧 Instalação e Configuração
+
+**1. Clone o repositório**
+```bash
+git clone https://github.com/joseRafael6/growup-squad22-backend.git
+cd growup-squad22-backend
+```
+
+**2. Instale as dependências**
+```bash
+npm install
+```
+
+**3. Configure as variáveis de ambiente**
+
+Copie o arquivo de exemplo e preencha com suas credenciais:
+```bash
+cp .env.example .env
+```
+
+```env
+# Supabase — connection pooling (para a aplicação)
+DATABASE_URL="postgresql://usuario:senha@host:6543/postgres?pgbouncer=true"
+
+# Supabase — conexão direta (para migrations)
+DIRECT_URL="postgresql://usuario:senha@host:5432/postgres"
+
+# Clerk — Autenticação
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
 CLERK_SECRET_KEY=sk_test_...
+
+# Clerk — Webhook
 CLERK_WEBHOOK_SECRET=whsec_...
 
-# Configurações do Servidor
-JWT_SECRET="sua_chave_secreta_jwt"
+# JWT
+JWT_SECRET=seu_secret_super_seguro
+
+# Servidor
 PORT=3000
 NODE_ENV=development
-🚀 Como Executar o Projeto
-1. Instalar as dependências:
-Bash
-npm install
-2. Sincronizar as tabelas com o Supabase (Importante):
-Se as tabelas ainda não estiverem aparecendo no painel do seu Supabase, você precisa empurrar a estrutura definida no schema.prisma para a nuvem. Execute:
+```
 
-Bash
-# Para ambientes de desenvolvimento (Criando histórico de migrações):
+**4. Execute as migrations do banco de dados**
+```bash
 npm run db:migrate
+```
 
-# OU se quiser apenas testar e sincronizar a estrutura imediatamente:
-npx prisma db push
-Após rodar este comando, lembre-se de ir ao painel do Supabase, clicar em Table Editor e certificar-se de selecionar o schema public no topo da tela.
-
-3. Executar em modo de Desenvolvimento:
-Bash
-npm run dev
-O servidor Fastify iniciará por padrão no endereço: http://localhost:3000.
-
-4. Gerar os Tipos do Prisma (Sempre que alterar o schema):
-Bash
+**5. Gere o Prisma Client**
+```bash
 npm run db:generate
-5. Abrir o Prisma Studio (Interface visual local):
-Bash
+```
+
+---
+
+## ▶️ Executando o Projeto
+
+**Modo desenvolvimento (hot reload):**
+```bash
+npm run dev
+```
+
+**Build e produção:**
+```bash
+npm run build
+npm start
+```
+
+**Visualizar o banco de dados (Prisma Studio):**
+```bash
 npm run db:studio
-📋 Endpoints da API
-Abaixo estão detalhadas as principais rotas disponíveis na aplicação:
+```
 
-Autenticação & Webhooks
-POST /api/webhooks/clerk: Endpoint público que recebe os eventos disparados pelo Clerk (user.created, user.updated, user.deleted) e sincroniza automaticamente com a tabela users do Supabase.
+---
 
-Usuários
-GET /api/health: Verifica se a API está online e respondendo.
+## 📡 Endpoints da API
 
-GET /api/test-db: Retorna a listagem direta de usuários para fins de validação da conexão.
+### Usuários
+| Método | Rota | Descrição | Auth |
+|---|---|---|---|
+| `POST` | `/users/sync` | Sincroniza usuário autenticado via Clerk | JWT |
 
-POST /api/users/sync: Rota manual para sincronizar dados cadastrais de perfil de usuário.
+### Quiz
+| Método | Rota | Descrição | Auth |
+|---|---|---|---|
+| `GET` | `/questions` | Retorna perguntas embaralhadas | JWT |
+| `POST` | `/answers` | Submete uma resposta e calcula pontuação | JWT |
+| `GET` | `/ranking` | Retorna o Top 10 do ranking global | JWT |
 
-Quizzes (Requerem cabeçalho Authorization: Bearer <JWT_TOKEN>)
-GET /questions?quizId=X&userId=Y: Cria uma sessão de quiz e retorna a lista de perguntas associadas com as alternativas embaralhadas. O back-end remove o campo isCorrect da resposta HTTP por motivos de segurança.
+### Admin
+| Método | Rota | Descrição | Auth |
+|---|---|---|---|
+| `POST` | `/admin/questions` | Cria uma nova pergunta | JWT + Admin Role |
+| `PUT` | `/admin/questions/:id` | Edita uma pergunta | JWT + Admin Role |
+| `DELETE` | `/admin/questions/:id` | Remove uma pergunta | JWT + Admin Role |
 
-POST /answers: Envia a resposta de uma questão.
+### Webhooks
+| Método | Rota | Descrição |
+|---|---|---|
+| `POST` | `/webhooks/clerk` | Recebe eventos do Clerk (criação de usuário) |
 
-Body esperado:
+---
 
-JSON
+## 🧮 Lógica de Pontuação
+
+A pontuação é calculada com base no **peso da questão** e no **tempo de resposta**:
+
+```
+Pontos = Peso da Questão × Multiplicador de Tempo
+```
+
+- Respostas mais rápidas geram um multiplicador maior.
+- Respostas enviadas após o tempo limite são invalidadas.
+- Em caso de empate no ranking, o critério de desempate é o **menor tempo total**.
+
+---
+
+## 🔐 Segurança
+
+- Autenticação via **JWT do Clerk** em todas as rotas de jogador.
+- Rotas `/admin/*` exigem `Role: Admin` no metadata do usuário no Clerk.
+- **Rate limiting:** 40 requisições por minuto por usuário (`429 Too Many Requests`).
+- E-mails duplicados são rejeitados com `409 Conflict`.
+- Tentativas de acesso não autorizado a rotas admin retornam `403 Forbidden`.
+
+---
+
+## 🔄 Fluxo de uma Requisição
+
+```
+1. Usuário clica em uma alternativa → Frontend envia POST /answers
+2. Middleware valida o Bearer Token do Clerk
+3. Controller extrai option_id e response_time_ms do body
+4. Use Case verifica se a alternativa está correta no banco
+5. Calcula: Pontos = PesoQuestão × MultiplicadorTempo
+6. Repositório faz INSERT na tabela de respostas e UPDATE no score da sessão
+7. API retorna 201 Created com JSON confirmando pontuação
+```
+
+---
+
+## ⚠️ Tratamento de Erros
+
+| Código | Situação |
+|---|---|
+| `401` | Token JWT inválido ou ausente |
+| `403` | Usuário sem permissão de Admin |
+| `409` | E-mail já cadastrado |
+| `429` | Rate limit excedido |
+| `503` | Banco de dados indisponível |
+
+Todas as respostas de erro seguem o padrão:
+```json
 {
-  "sessionId": "UUID",
-  "questionId": "UUID",
-  "optionId": "UUID",
-  "responseTimeMs": 4500
+  "status": "error",
+  "message": "Descrição do erro"
 }
-GET /ranking?quizId=X&userId=Y: Retorna a lista dos 10 melhores colocados no Quiz informado, acompanhado da posição atual e score do usuário que fez a requisição.
+```
+
+---
+
+## 👥 Equipe — Squad 22
+
+Projeto desenvolvido com 13 membros divididos em grupos temáticos durante a **Residência em Software & IA — GrowUp**.
+
+---
+
+## 📄 Licença
+
+ISC — veja o arquivo [LICENSE](./LICENSE) para mais detalhes.
